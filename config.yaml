@@ -1,0 +1,19 @@
+name: SolarSynkV4
+slug: solar_synkv4
+description: Sunsynk cloud monitoring and controls through MQTT
+version: 0.1.15
+url: https://github.com/martinville/SolarSynkV4
+arch:
+  - amd64
+  - aarch64
+init: false
+ingress: true
+ingress_port: 8099
+panel_title: SolarSynkV4
+panel_icon: mdi:solar-power-variant
+startup: application
+boot: auto
+services:
+  - mqtt:want
+options: {}
+schema: {}
