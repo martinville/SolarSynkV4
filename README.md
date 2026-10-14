@@ -37,30 +37,20 @@ MFA authentication is not currently supported or validated. Inteless support is 
 
 ## Installation
 
-### Current local installation
-
-The repository is not yet packaged and validated as a URL-installable Home Assistant add-on repository. Do not assume that adding this GitHub URL to the store will install it.
-
-1. Download this repository.
-2. Create a folder named `solarsynkv4` inside Home Assistant's local apps directory, `/local_apps`.
-3. Copy the repository contents into that folder. Its structure should include:
+1. In Home Assistant, open **Settings → Apps → App store**, or **Settings → Add-ons → Add-on Store** on versions using the older names.
+2. Open the **⋮** menu and select **Repositories**.
+3. Add this repository URL:
 
    ```text
-   /local_apps/solarsynkv4/
-       config.yaml
-       Dockerfile
-       requirements.txt
-       app/
-       docs/
+   https://github.com/martinville/SolarSynkV4
    ```
 
-4. Open **Settings → Apps → App store**, or the equivalent **Add-ons → Add-on Store** menu on your Home Assistant version.
-5. Choose **Check for updates**, locate **SolarSynkV4** under local apps, and install it.
-6. Start the app and open its sidebar interface.
+4. Close the repository dialog and find **SolarSynkV4** in the store. If it is not listed yet, choose **Check for updates** from the store menu.
+5. Open **SolarSynkV4** and select **Install**.
+6. Enable **Start on boot** and **Show in sidebar**, then select **Start**.
+7. Select **Open Web UI**, or open **SolarSynkV4** from the sidebar, to complete setup.
 
-The local directory must be on the Home Assistant host, not merely in your personal computer's download folder. Installation and image builds still require live validation.
-
-See [Installation and first run](docs/INSTALL.md) for details and updates.
+Home Assistant builds the app image during installation. If installation fails, inspect the installation logs and report the error through GitHub Issues.
 
 ## First-time setup
 
@@ -130,7 +120,7 @@ Use **Activity** for recent events. See [Troubleshooting](docs/TROUBLESHOOTING.m
 
 ## Updating and migrating
 
-For a local installation, replace the files in the existing `/local_apps/solarsynkv4` folder, then check for updates and update the app. Restarting alone does not rebuild the installed image.
+In Home Assistant, open the App/Add-on Store and choose **Check for updates**. When a new version is available, open **SolarSynkV4** and select **Update**. Restarting alone does not install a new version.
 
 SolarSynkV4 uses its own MQTT devices and unique IDs. Existing SolarSynkV3 entity references, dashboards and automations may need updating.
 
