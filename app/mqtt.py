@@ -6,6 +6,7 @@ import time
 import paho.mqtt.client as mqtt
 from .settings import CONTROLS, readable_settings
 from .telemetry import timestamp_age
+from .naming import device_name
 
 
 def test_connection(config, timeout=6):
@@ -151,7 +152,8 @@ class Broker:
         return None
     def _device(self, serial):
         info = self.devices.get(serial, {})
-        return {'identifiers': ['solarsynkv4_' + serial], 'name': 'SolarsynkV4', 'manufacturer': 'Sunsynk', 'model': info.get('model') or 'Inverter', 'serial_number': serial}
+        name = device_name(self.store.data['names'].get(serial), info.get('alias'), serial)
+        return {'identifiers': ['solarsynkv4_' + serial], 'name': name, 'manufacturer': 'Sunsynk', 'model': info.get('model') or 'Inverter', 'serial_number': serial}
     def entity(self, serial, key, name, kind='sensor', unit=None, device_class=None, state_class=None, control=False, category=None, app_only=False):
         if serial not in self.store.data['selected'] or not re.fullmatch(r'[A-Za-z0-9_-]+', serial):
             return

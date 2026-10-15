@@ -19,6 +19,7 @@ sys.modules.setdefault('paho', fake_paho)
 sys.modules.setdefault('paho.mqtt', fake_paho_mqtt)
 sys.modules.setdefault('paho.mqtt.client', fake_paho_client)
 from app.mqtt import Broker
+from app.naming import device_name, validate_device_name
 from app.store import Store
 from app.supervisor import mqtt_service, mqtt_service_status
 from app.discovery import discover, merge_devices
@@ -377,7 +378,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(topic, 'homeassistant/sensor/solarsynkv4_A1/input_pac/config')
         self.assertEqual(config['unique_id'], 'solarsynkv4_A1_input_pac')
         self.assertEqual(config['device']['identifiers'], ['solarsynkv4_A1'])
-        self.assertEqual(config['device']['name'], 'SolarsynkV4')
+        self.assertEqual(config['device']['name'], 'Main')
         self.assertEqual(config['state_topic'], 'solarsynkv4/A1/input_pac/state')
         self.assertTrue(retain)
         self.assertEqual(qos, 1)
@@ -385,6 +386,30 @@ class CoreTests(unittest.TestCase):
         self.assertIn(('solarsynkv4/A1/availability', 'online', 1, True), published)
         self.assertTrue(any(t.endswith('/batteryShutdownCap/config') for t, _, _, _ in published))
         self.assertTrue(any('discovery' in args[1] for args, _ in events))
+
+    def test_device_name_validation_and_legacy_fallback(self):
+        self.assertEqual(validate_device_name('  Roof Inverter_2  '), 'Roof Inverter_2')
+        for invalid in ('', '   ', 'Roof/West', 'Solar ☀', '-Roof', 'Roof-', 'A' * 81, 'Roof\nWest'):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                validate_device_name(invalid)
+        self.assertEqual(device_name('Roof/West', 'Main', 'A1'), 'Main')
+        self.assertEqual(device_name('', 'Roof/West', 'A1'), 'A1')
+
+    def test_renamed_inverter_republishes_device_name_without_changing_identity(self):
+        sent = []
+        broker = Broker(self.store.data['mqtt'], self.store, lambda *args: None)
+        broker.connected = True
+        broker.publish = lambda topic, value, retain=False: sent.append((topic, value, retain))
+        broker.republish()
+        topic = 'homeassistant/sensor/solarsynkv4_A1/telemetry_status/config'
+        before = next(json.loads(value) for name, value, _ in sent if name == topic)
+        self.store.data['names']['A1'] = 'Roof Inverter 2'
+        sent.clear()
+        broker.republish()
+        after = next(json.loads(value) for name, value, retained in sent if name == topic and retained)
+        self.assertEqual(after['device']['name'], 'Roof Inverter 2')
+        self.assertEqual(after['device']['identifiers'], before['device']['identifiers'])
+        self.assertEqual(after['unique_id'], before['unique_id'])
 
     def test_selected_inverter_is_discovered_before_first_cloud_sample(self):
         published = []

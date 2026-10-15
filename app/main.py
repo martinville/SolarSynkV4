@@ -13,6 +13,7 @@ from .cloud import Cloud, CloudError
 from .discovery import discover, merge_devices
 from .dashboard import entity_rows, uptime_label
 from .mqtt import Broker, test_connection
+from .naming import DEVICE_NAME_HINT, device_name, validate_device_name
 from .settings import CONTROLS, SettingsManager, validate
 from .store import Store
 from .supervisor import mqtt_service_status
@@ -189,17 +190,23 @@ STYLE = '''
 
 def inverter_modal():
     rows = ''
+    entered = getattr(g, 'inverter_form', None)
+    selected = entered.getlist('serial') if entered is not None else store.data['selected']
     for item in state['devices']:
         serial = item['sn']
-        name = store.data['names'].get(serial) or item.get('alias') or serial
+        name = device_name(store.data['names'].get(serial), item.get('alias'), serial)
+        value = entered.get('name_' + serial, name) if entered is not None else name
         detail = ' · '.join(str(value) for value in (item.get('plant'), item.get('model'), serial) if value)
-        rows += f'<div class="inverter-choice"><label><input type="checkbox" name="serial" value="{esc(serial)}" {"checked" if serial in store.data["selected"] else ""}><span><strong>{esc(name)}</strong><small>{esc(detail)}</small></span></label>{field("name_" + serial, "Name in Home Assistant", name)}</div>'
+        name_field = f'<label>Name in Home Assistant<input class="form-control" name="{esc("name_" + serial)}" type="text" value="{esc(value)}" maxlength="80"></label><small>{esc(DEVICE_NAME_HINT)}</small>'
+        rows += f'<div class="inverter-choice"><label><input type="checkbox" name="serial" value="{esc(serial)}" {"checked" if serial in selected else ""}><span><strong>{esc(name)}</strong><small>{esc(detail)}</small></span></label>{name_field}</div>'
     if not rows:
         rows = '<p>No saved inverters yet. Connect your cloud account, then refresh the list.</p>'
     status = '<p class="notice" role="status">' + esc(state['discovery_message']) + '</p>' if state.get('discovery_message') else ''
+    if getattr(g, 'inverter_error', ''):
+        status += '<p class="error" role="alert">' + esc(g.inverter_error) + '</p>'
     if request.args.get('saved_inverters'):
         status += '<p class="notice" role="status">Inverter selection saved.</p>'
-    opened = ' is-open' if request.args.get('inverters') == 'open' else ''
+    opened = ' is-open' if request.args.get('inverters') == 'open' or getattr(g, 'inverter_error', '') else ''
     body = f'<div id="select-inverters" class="modal-overlay{opened}" role="dialog" aria-modal="true" aria-labelledby="inverter-dialog-title"><div class="modal-card inverter-modal"><div class="modal-header"><div><h3 id="inverter-dialog-title">Select Inverters</h3><p>Your saved list remains here after restart. Refresh only when your cloud account gains a new inverter.</p></div><a class="modal-close" href="./" aria-label="Close inverter selection">×</a></div>'
     body += status + '<div class="refresh-row"><span>' + esc(len(state['devices'])) + ' inverter(s) in your saved list</span>' + form('discover', '', 'Refresh inverter list') + '</div>'
     body += '<p class="muted">Select only the inverters you want in Home Assistant. Deselecting one stops its updates and removes its V4 discovery entities; history remains in Home Assistant.</p>'
@@ -497,12 +504,17 @@ def save_devices():
     known = {device['sn'] for device in store.data.get('devices', [])}
     if not set(selected) <= known:
         abort(400)
+    names = {}
+    for serial in selected:
+        try:
+            names[serial] = validate_device_name(request.form.get('name_' + serial, ''))
+        except ValueError as exc:
+            g.inverter_error = f'Inverter {serial}: {exc}'
+            g.inverter_form = request.form
+            return index(), 400
     old = set(store.data['selected'])
     store.data['selected'] = selected
-    for serial in selected:
-        name = request.form.get('name_' + serial, '').strip()[:80]
-        if name:
-            store.data['names'][serial] = name
+    store.data['names'].update(names)
     store.save()
     activity_event('inverters', f'Saved {len(selected)} selected inverter(s).')
     broker.republish()
